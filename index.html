@@ -680,6 +680,9 @@ function renderMun(){
   const resEl = document.getElementById('mun-result');
   if(!mun){resEl.innerHTML=''; return;}
 
+  // Destroy old chart before replacing canvas via innerHTML
+  if(chartInstances['mun-ev']){ chartInstances['mun-ev'].destroy(); delete chartInstances['mun-ev']; }
+
   const data = MUN[mun];
   if(!data){resEl.innerHTML='<div class="empty">Dados não disponíveis</div>'; return;}
 
@@ -747,7 +750,7 @@ function renderMun(){
       display.forEach((c,i)=>{
         html += `<tr>
           <td><span class="rank-num ${i===0?'gold':i===1?'silver':i===2?'bronze':''}">${i+1}</span></td>
-          <td>${escHtml(c.c)}</td>
+          <td style="white-space:nowrap">${escHtml(c.c)}</td>
           <td><span class="badge badge-blue">${escHtml(c.p)}</span></td>
           <td>${fmt(c.v)}</td>
           <td>${pct(c.v,total)}</td>
@@ -895,6 +898,9 @@ function onBairroMunChange(){
   // Reset candidate filter when municipality changes
   selectedBairroCand = null;
   document.getElementById('bairro-search').value = '';
+  document.getElementById('bairro-search-res').style.display = 'none';
+  // Destroy old bairro chart before replacing canvas via innerHTML
+  if(chartInstances['bairro-chart']){ chartInstances['bairro-chart'].destroy(); delete chartInstances['bairro-chart']; }
   // Reset year filter
   document.getElementById('bairro-year').innerHTML = '<option value="all">Todos os anos</option>';
   DASH.years.forEach(y=>{
