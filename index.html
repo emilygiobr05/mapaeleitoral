@@ -876,23 +876,24 @@ function renderTop(){
       const [ky,...cp]=k.split('_'); const cl=cp.join('_');
       return `<span class="badge ${v.includes('ELEITO')&&!v.includes('NÃO')?'badge-green':'badge-red'}" style="display:inline-block;margin:2px;white-space:nowrap">${escHtml(ky)} ${escHtml(cl)}</span>`;
     }).join('');
-    html += `<tr>
-      <td><span class="rank-num ${i===0?'gold':i===1?'silver':i===2?'bronze':''}">${i+1}</span></td>
-      <td style="font-weight:${i<3?700:400}">${escHtml(name)}</td>
-      <td><span class="badge badge-blue">${escHtml(d.p)}</span></td>
-      <td>${Array.from(d.cargos).map(escHtml).join(', ')}</td>
-      <td>${Array.from(d.anos).sort().join(', ')}</td>
-      <td>${(()=>{
-        const anos = Object.keys(d.vy||{}).sort();
-        if(anos.length<=1) return `<strong>${fmt(d.v)}</strong>`;
-        const rows = anos.map(y=>`<div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><span style="color:var(--accent);font-size:.78rem;font-weight:700">${y}</span><span style="font-weight:600">${fmt(d.vy[y])}</span></div>`).join('');
-        return `${rows}<div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px;display:flex;justify-content:space-between;gap:12px;align-items:center"><span style="color:var(--muted);font-size:.75rem">Total</span><strong>${fmt(d.v)}</strong></div>`;
-      })()}</td>
-      <td style="min-width:120px">
-        <div class="progress-bar"><div class="progress-fill" style="width:${Math.round(d.v/maxV*100)}%"></div></div>
-      </td>
-      <td style="min-width:180px">${stHtml||'—'}</td>
-    </tr>`;
+    const vyAnos = Object.keys(d.vy||{}).sort().filter(y=>(d.vy[y]||0)>0);
+    let votesCell;
+    if(vyAnos.length<=1){
+      votesCell = '<strong>'+fmt(d.v)+'</strong>';
+    } else {
+      votesCell = vyAnos.map(y=>'<div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><span class="badge badge-blue" style="min-width:44px;text-align:center">'+y+'</span><span style="font-weight:600">'+fmt(d.vy[y])+'</span></div>').join('');
+      votesCell += '<div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px;display:flex;justify-content:space-between;gap:12px;align-items:center"><span style="color:var(--muted);font-size:.75rem">Total</span><strong>'+fmt(d.v)+'</strong></div>';
+    }
+    html += '<tr>'
+      +'<td><span class="rank-num '+(i===0?'gold':i===1?'silver':i===2?'bronze':'')+'">'+( i+1)+'</span></td>'
+      +'<td style="font-weight:'+(i<3?700:400)+'">'+escHtml(name)+'</td>'
+      +'<td><span class="badge badge-blue">'+escHtml(d.p)+'</span></td>'
+      +'<td>'+Array.from(d.cargos).map(escHtml).join(', ')+'</td>'
+      +'<td>'+Array.from(d.anos).sort().join(', ')+'</td>'
+      +'<td>'+votesCell+'</td>'
+      +'<td style="min-width:120px"><div class="progress-bar"><div class="progress-fill" style="width:'+Math.round(d.v/maxV*100)+'%"></div></div></td>'
+      +'<td style="min-width:180px">'+(stHtml||'—')+'</td>'
+      +'</tr>';
   });
   
   html += '</tbody></table></div>';
