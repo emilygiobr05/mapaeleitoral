@@ -741,6 +741,7 @@ function renderMun(){
 
       html += `<div class="card">
         <h3>${escHtml(cargo)}${electedLabel} · <span style="color:var(--text)">${fmt(total)} votos</span></h3>
+        <div class="tbl-wrap">
         <table><thead><tr><th>#</th><th>Candidato</th><th>Partido</th><th>Votos</th><th>%</th><th>Status</th></tr></thead>
         <tbody>`;
       display.forEach((c,i)=>{
@@ -753,7 +754,7 @@ function renderMun(){
           <td>${munStatusBadge(c.s)}</td>
         </tr>`;
       });
-      html += `</tbody></table></div>`;
+      html += `</tbody></table></div></div>`;
     });
 
     html += `</div></div>`;
@@ -988,10 +989,10 @@ function renderBairro(){
       <div class="card">
         <h3>📋 Tabela de Bairros — ${escHtml(selectedBairroCand)} em ${escHtml(mun)}</h3>
         <div class="tbl-wrap" style="max-height:420px;overflow-y:auto">
-          <table id="bairro-table"><thead><tr><th>#</th><th>Bairro</th><th>Votos (Candidato)</th><th>% do Total</th><th>Total Bairro</th></tr></thead>
+          <table id="bairro-table"><thead><tr><th>#</th><th>Bairro</th><th>Votos (Candidato)</th><th>% dos votos do cand.</th><th>Total do Bairro</th><th>% no Bairro</th></tr></thead>
           <tbody>${sorted.slice(0,100).map(([b,v],i)=>{
             const bt = munBairros[b]?munBairros[b].t:v;
-            return `<tr><td>${i+1}</td><td>${escHtml(b)}</td><td>${fmt(v)}</td><td>${pct(v,totalVotes)}</td><td>${fmt(bt)}</td></tr>`;
+            return `<tr><td>${i+1}</td><td>${escHtml(b)}</td><td>${fmt(v)}</td><td>${pct(v,totalVotes)}</td><td>${fmt(bt)}</td><td>${pct(v,bt)}</td></tr>`;
           }).join('')}</tbody></table>
         </div>
       </div>`;
