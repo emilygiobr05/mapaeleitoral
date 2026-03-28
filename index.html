@@ -149,6 +149,10 @@ tr:hover td{background:var(--hover)}
       <option value="NÃO ELEITO">Não Eleito</option>
       <option value="SUPLENTE">Suplente</option>
     </select>
+    <label>Município:</label>
+    <select id="dash-municipio" onchange="renderDashTable()">
+      <option value="all">Todos</option>
+    </select>
     <input type="text" id="dash-search" placeholder="Buscar candidato..." oninput="renderDashTable()" style="max-width:200px">
   </div>
   <div class="grid grid-4" style="margin-bottom:16px" id="dash-stats"></div>
@@ -383,6 +387,11 @@ function initDash(){
   const selC = document.getElementById('dash-cargo');
   Object.keys(DASH.vcy).sort().forEach(c=>{
     const o = document.createElement('option'); o.value=c; o.textContent=c; selC.appendChild(o);
+  });
+  // Populate municipio select
+  const selM = document.getElementById('dash-municipio');
+  Object.keys(DASH.vmy).sort().forEach(m=>{
+    const o = document.createElement('option'); o.value=m; o.textContent=m; selM.appendChild(o);
   });
   renderDash();
 }
@@ -1148,6 +1157,7 @@ function renderDashTable(){
   const pt  = document.getElementById('dash-partido').value;
   const cg  = document.getElementById('dash-cargo').value;
   const st  = document.getElementById('dash-status').value;
+  const mun = document.getElementById('dash-municipio').value;
   const q   = (document.getElementById('dash-search').value||'').toUpperCase().trim();
 
   // Build flat rows: one per year+cargo participation from CAND.st
@@ -1166,18 +1176,31 @@ function renderDashTable(){
         if(cg!=='all' && cargoLabel!==cg) return;
         const stVal = stObj[k]||'';
         if(st!=='all' && !stVal.toUpperCase().includes(st)) return;
-        const votos = (d.va && d.va[ky]) || 0;
-        rows.push({name, p:d.p, cargo:cargoLabel, ano:ky, v:votos, status:stVal});
+        // Municipality filter: check if candidate has votes in selected mun for that year
+        if(mun!=='all'){
+          const munVotes = d.vm && d.vm[ky] && d.vm[ky][mun];
+          if(!munVotes) return;
+          rows.push({name, p:d.p, cargo:cargoLabel, ano:ky, v:munVotes, status:stVal});
+        } else {
+          const votos = (d.va && d.va[ky]) || 0;
+          rows.push({name, p:d.p, cargo:cargoLabel, ano:ky, v:votos, status:stVal});
+        }
       });
     } else {
       // Candidate with no status data — use va/a fields
       (d.a||[]).forEach(ky=>{
         if(yr!=='all' && ky!==yr) return;
         if(st!=='all') return; // no status to filter on
-        const votos = (d.va && d.va[ky]) || 0;
         (d.c||[]).forEach(cargoLabel=>{
           if(cg!=='all' && cargoLabel!==cg) return;
-          rows.push({name, p:d.p, cargo:cargoLabel, ano:ky, v:votos, status:'—'});
+          if(mun!=='all'){
+            const munVotes = d.vm && d.vm[ky] && d.vm[ky][mun];
+            if(!munVotes) return;
+            rows.push({name, p:d.p, cargo:cargoLabel, ano:ky, v:munVotes, status:'—'});
+          } else {
+            const votos = (d.va && d.va[ky]) || 0;
+            rows.push({name, p:d.p, cargo:cargoLabel, ano:ky, v:votos, status:'—'});
+          }
         });
       });
     }
