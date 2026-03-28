@@ -292,8 +292,8 @@ select:disabled{opacity:.45;cursor:not-allowed}
     </div>
     <button id="bairro-clear-cand" title="Limpar candidato" onclick="clearBairroCand()" style="display:none;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.2rem;padding:2px 8px;border-radius:4px;line-height:1;transition:color .2s" onmouseover="this.style.color='var(--accent3)'" onmouseout="this.style.color='var(--muted)'">✕</button>
     <label>Ano:</label>
-    <select id="bairro-year" onchange="renderBairro()" disabled title="Selecione um candidato para filtrar por ano">
-      <option value="all">Todos</option>
+    <select id="bairro-year" onchange="renderBairro()" title="Filtrar por ano">
+      <option value="all">Todos os anos</option>
     </select>
     <button class="btn-exp" onclick="exportBairroExcel()">📊 Excel</button>
     <button class="btn-exp" onclick="exportBairroPdf()">🖨️ PDF</button>
@@ -928,8 +928,8 @@ function onBairroMunChange(){
     const o = document.createElement('option'); o.value=y; o.textContent=y;
     sel.appendChild(o);
   });
-  sel.disabled = true;
-  sel.title = 'Selecione um candidato para filtrar por ano';
+  sel.disabled = false;
+  sel.title = 'Filtrar por ano';
   renderBairro();
 }
 
@@ -981,8 +981,8 @@ function clearBairroCand(){
   DASH.years.forEach(y=>{
     const o = document.createElement('option'); o.value=y; o.textContent=y; sel.appendChild(o);
   });
-  sel.disabled = true;
-  sel.title = 'Selecione um candidato para filtrar por ano';
+  sel.disabled = false;
+  sel.title = 'Filtrar por ano';
   renderBairro();
 }
 
@@ -1076,7 +1076,29 @@ function renderBairro(){
 
   } else {
     // --- MUNICIPALITY MODE: show all bairros with top candidates ---
-    const sorted = Object.entries(munBairros).sort((a,b)=>b[1].t-a[1].t);
+    let sorted;
+    if(yr==='all'){
+      sorted = Object.entries(munBairros).sort((a,b)=>b[1].t-a[1].t);
+    } else {
+      // Build per-bairro totals for the selected year from CAND.vb
+      const munBairroNames = new Set(Object.keys(munBairros));
+      const bairroMap = {};
+      Object.entries(CAND).forEach(([name,d])=>{
+        const byBairro = (d.vb||{})[yr]||{};
+        Object.entries(byBairro).forEach(([b,v])=>{
+          if(!munBairroNames.has(b)) return;
+          if(!bairroMap[b]) bairroMap[b]={t:0,cands:{}};
+          bairroMap[b].t+=v;
+          bairroMap[b].cands[name]={v,p:d.p};
+        });
+      });
+      sorted = Object.entries(bairroMap)
+        .map(([b,bd])=>{
+          const tc=Object.entries(bd.cands).sort((a,b2)=>b2[1].v-a[1].v).slice(0,20).map(([c,{v,p}])=>({c,p,v}));
+          return [b,{t:bd.t,tc}];
+        })
+        .sort((a,b)=>b[1].t-a[1].t);
+    }
     if(!sorted.length){resEl.innerHTML='<div class="empty">Sem dados de bairro para este município</div>'; return;}
     renderBairroTable(resEl, mun, sorted, yr);
   }
@@ -1098,12 +1120,12 @@ function renderBairroTable(resEl, mun, sorted, yr){
 
   resEl.innerHTML = `
     <div class="card" style="margin-bottom:16px">
-      <h3>📊 Bairros de ${escHtml(mun)} — Votos Totais</h3>
+      <h3>📊 Bairros de ${escHtml(mun)} — Votos Totais${yr&&yr!=='all'?' ('+yr+')':''}</h3>
       <div class="tooltip-info">${fmt(totalVotes)} votos em ${sorted.length} bairros registrados${chartNote}</div>
       <div class="chart-container tall" style="margin-top:12px"><canvas id="bairro-chart"></canvas></div>
     </div>
     <div class="card">
-      <h3>📋 Tabela de Bairros — ${escHtml(mun)}</h3>
+      <h3>📋 Tabela de Bairros — ${escHtml(mun)}${yr&&yr!=='all'?' ('+yr+')':''}</h3>
       <div style="margin-bottom:10px"><input class="bairro-tbl-filter" type="text" placeholder="🔍 Filtrar bairro..." oninput="filterBairroTable(this.value)"></div>
       <div class="tbl-wrap" style="max-height:640px;overflow-y:auto">
         <table id="bairro-table"><thead><tr>
