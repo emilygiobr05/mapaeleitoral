@@ -823,14 +823,9 @@ function renderTop(){
           const hasVotes = CAND[name] && Object.values(CAND[name].vm).some(mv=>(mv[mun]||0)>0);
           if(!hasVotes) return;
         }
-        if(!agg[name]) agg[name]={p,v:0,vm:{},cargos:new Set(),anos:new Set()};
-        // When mun filter: use votes from that municipality only
-        let vv = v;
-        if(mun!=='all' && CAND[name]){
-          vv = Object.values(CAND[name].vm).reduce((acc,mv)=>acc+(mv[mun]||0),0);
-        }
+        if(!agg[name]) agg[name]={p,v:0,vy:{},cargos:new Set(),anos:new Set()};
         agg[name].v += mun==='all'?v:0;
-        if(!agg[name]._set) agg[name]._set=true;
+        if(mun==='all') agg[name].vy[y] = (agg[name].vy[y]||0)+v;
         agg[name].cargos.add(c);
         agg[name].anos.add(y);
       });
@@ -841,13 +836,14 @@ function renderTop(){
   if(mun!=='all'){
     Object.keys(agg).forEach(name=>{
       if(!CAND[name]) return;
-      let total = 0;
       const d = CAND[name];
+      agg[name].vy = {};
       Object.entries(d.vm).forEach(([y,mv])=>{
         if(yr!=='all' && y!==yr) return;
-        total += (mv[mun]||0);
+        const yv = mv[mun]||0;
+        agg[name].vy[y] = (agg[name].vy[y]||0)+yv;
       });
-      agg[name].v = total;
+      agg[name].v = Object.values(agg[name].vy).reduce((a,b)=>a+b,0);
     });
   }
   
@@ -886,7 +882,12 @@ function renderTop(){
       <td><span class="badge badge-blue">${escHtml(d.p)}</span></td>
       <td>${Array.from(d.cargos).map(escHtml).join(', ')}</td>
       <td>${Array.from(d.anos).sort().join(', ')}</td>
-      <td><strong>${fmt(d.v)}</strong></td>
+      <td>${(()=>{
+        const anos = Object.keys(d.vy||{}).sort();
+        if(anos.length<=1) return `<strong>${fmt(d.v)}</strong>`;
+        const rows = anos.map(y=>`<div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><span style="color:var(--accent);font-size:.78rem;font-weight:700">${y}</span><span style="font-weight:600">${fmt(d.vy[y])}</span></div>`).join('');
+        return `${rows}<div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px;display:flex;justify-content:space-between;gap:12px;align-items:center"><span style="color:var(--muted);font-size:.75rem">Total</span><strong>${fmt(d.v)}</strong></div>`;
+      })()}</td>
       <td style="min-width:120px">
         <div class="progress-bar"><div class="progress-fill" style="width:${Math.round(d.v/maxV*100)}%"></div></div>
       </td>
