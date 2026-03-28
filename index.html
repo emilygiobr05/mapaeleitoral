@@ -103,6 +103,9 @@ tr:hover td{background:var(--hover)}
 .ypill{padding:4px 10px;border-radius:12px;font-size:.78rem;background:var(--hover);color:var(--muted);cursor:pointer;border:1px solid var(--border)}
 .ypill.active{background:var(--accent);color:#000;border-color:var(--accent)}
 .section-divider{font-size:1rem;font-weight:700;color:var(--accent);padding:10px 0 6px;border-bottom:1px solid var(--border);margin-bottom:12px}
+.sortable-th{cursor:pointer;user-select:none;white-space:nowrap}.sortable-th:hover{color:var(--text)}.sortable-th.sorted{color:var(--accent)}
+.bairro-tbl-filter{background:var(--hover);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:.85rem;outline:none;transition:border .2s;min-width:180px}.bairro-tbl-filter:focus{border-color:var(--accent)}
+select:disabled{opacity:.45;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -287,8 +290,9 @@ tr:hover td{background:var(--hover)}
       <input type="text" id="bairro-search" placeholder="Filtrar por candidato..." oninput="searchBairroCand(this.value)" autocomplete="off" style="width:100%">
       <div id="bairro-search-res" class="search-results" style="display:none"></div>
     </div>
+    <button id="bairro-clear-cand" title="Limpar candidato" onclick="clearBairroCand()" style="display:none;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.2rem;padding:2px 8px;border-radius:4px;line-height:1;transition:color .2s" onmouseover="this.style.color='var(--accent3)'" onmouseout="this.style.color='var(--muted)'">✕</button>
     <label>Ano:</label>
-    <select id="bairro-year" onchange="renderBairro()">
+    <select id="bairro-year" onchange="renderBairro()" disabled title="Selecione um candidato para filtrar por ano">
       <option value="all">Todos</option>
     </select>
     <button class="btn-exp" onclick="exportBairroExcel()">📊 Excel</button>
@@ -364,6 +368,12 @@ function makeChart(id, type, labels, datasets, opts={}){
 
 // ===== NAVIGATION =====
 function showSection(id){
+  // Save bairro filters before leaving
+  if(document.getElementById('sec-bairro').classList.contains('active')){
+    sessionStorage.setItem('bairro_mun', document.getElementById('bairro-mun').value);
+    sessionStorage.setItem('bairro_yr', document.getElementById('bairro-year').value);
+    sessionStorage.setItem('bairro_cand', selectedBairroCand||'');
+  }
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('sec-'+id).classList.add('active');
@@ -371,6 +381,7 @@ function showSection(id){
   if(id==='dash') renderDash();
   if(id==='top50') renderTop();
   if(id==='cruzamento') renderCross();
+  if(id==='bairro') restoreBairroFilters();
 }
 
 // ===== DASHBOARD =====
@@ -889,6 +900,8 @@ function renderTop(){
 
 // ===== BAIRRO =====
 let selectedBairroCand = null;
+let bairroSortCol = 'votes'; // 'name' | 'votes'
+let bairroSortDir = 'desc';  // 'asc'  | 'desc'
 
 function initBairro(){
   const sel = document.getElementById('bairro-mun');
@@ -902,14 +915,19 @@ function onBairroMunChange(){
   selectedBairroCand = null;
   document.getElementById('bairro-search').value = '';
   document.getElementById('bairro-search-res').style.display = 'none';
+  document.getElementById('bairro-clear-cand').style.display = 'none';
+  bairroSortCol = 'votes'; bairroSortDir = 'desc';
   // Destroy old bairro chart before replacing canvas via innerHTML
   if(chartInstances['bairro-chart']){ chartInstances['bairro-chart'].destroy(); delete chartInstances['bairro-chart']; }
-  // Reset year filter
-  document.getElementById('bairro-year').innerHTML = '<option value="all">Todos os anos</option>';
+  // Reset year filter and keep disabled (no candidate selected)
+  const sel = document.getElementById('bairro-year');
+  sel.innerHTML = '<option value="all">Todos os anos</option>';
   DASH.years.forEach(y=>{
     const o = document.createElement('option'); o.value=y; o.textContent=y;
-    document.getElementById('bairro-year').appendChild(o);
+    sel.appendChild(o);
   });
+  sel.disabled = true;
+  sel.title = 'Selecione um candidato para filtrar por ano';
   renderBairro();
 }
 
@@ -938,12 +956,31 @@ function selectBairroCand(name){
   selectedBairroCand = name;
   document.getElementById('bairro-search').value = name;
   document.getElementById('bairro-search-res').style.display='none';
+  document.getElementById('bairro-clear-cand').style.display='';
   const sel = document.getElementById('bairro-year');
   const d = CAND[name];
   sel.innerHTML = '<option value="all">Todos os anos</option>';
   (d.a||[]).sort().forEach(y=>{
     const o = document.createElement('option'); o.value=y; o.textContent=y; sel.appendChild(o);
   });
+  sel.disabled = false;
+  sel.title = '';
+  renderBairro();
+}
+
+function clearBairroCand(){
+  selectedBairroCand = null;
+  document.getElementById('bairro-search').value = '';
+  document.getElementById('bairro-search-res').style.display='none';
+  document.getElementById('bairro-clear-cand').style.display='none';
+  bairroSortCol = 'votes'; bairroSortDir = 'desc';
+  const sel = document.getElementById('bairro-year');
+  sel.innerHTML = '<option value="all">Todos os anos</option>';
+  DASH.years.forEach(y=>{
+    const o = document.createElement('option'); o.value=y; o.textContent=y; sel.appendChild(o);
+  });
+  sel.disabled = true;
+  sel.title = 'Selecione um candidato para filtrar por ano';
   renderBairro();
 }
 
@@ -984,24 +1021,39 @@ function renderBairro(){
       return;
     }
 
-    const sorted = Object.entries(candBairros).sort((a,b)=>b[1]-a[1]);
-    const totalVotes = sorted.reduce((s,[,v])=>s+v,0);
-    const top30 = sorted.slice(0,30);
-    const maxV = top30.length?top30[0][1]:1;
+    const baseSorted = Object.entries(candBairros).sort((a,b)=>b[1]-a[1]);
+    const totalVotes = baseSorted.reduce((s,[,v])=>s+v,0);
+    // Apply user-requested sort
+    let display;
+    if(bairroSortCol==='name'){
+      display = [...baseSorted].sort((a,b)=>bairroSortDir==='asc'?a[0].localeCompare(b[0]):b[0].localeCompare(a[0]));
+    } else {
+      display = bairroSortDir==='asc'?[...baseSorted].reverse():baseSorted;
+    }
+    const top30 = baseSorted.slice(0,30); // chart always top-30 by votes
+    const sortIcon = col => bairroSortCol!==col?'<span style="opacity:.3">⇅</span>':bairroSortDir==='asc'?'<span style="color:var(--accent)">↑</span>':'<span style="color:var(--accent)">↓</span>';
+    const chartNote = baseSorted.length>30?` • Gráfico: top 30 de ${baseSorted.length}`:'';
 
     resEl.innerHTML = `
       <div class="card" style="margin-bottom:16px">
         <h3>📊 ${escHtml(selectedBairroCand)} — Bairros em ${escHtml(mun)} ${yr!=='all'?'('+yr+')':'(todos os anos)'}</h3>
-        <div class="tooltip-info">${fmt(totalVotes)} votos em ${sorted.length} bairros neste município</div>
+        <div class="tooltip-info">${fmt(totalVotes)} votos em ${baseSorted.length} bairros neste município${chartNote}</div>
         <div class="chart-container tall" style="margin-top:12px"><canvas id="bairro-chart"></canvas></div>
       </div>
       <div class="card">
         <h3>📋 Tabela de Bairros — ${escHtml(selectedBairroCand)} em ${escHtml(mun)}</h3>
+        <div style="margin-bottom:10px"><input class="bairro-tbl-filter" type="text" placeholder="🔍 Filtrar bairro..." oninput="filterBairroTable(this.value)"></div>
         <div class="tbl-wrap" style="max-height:640px;overflow-y:auto">
-          <table id="bairro-table"><thead><tr><th style="width:40px">#</th><th style="min-width:140px">Bairro</th><th style="min-width:120px">Votos (Candidato)</th><th style="min-width:120px">% dos votos do cand.</th></tr></thead>
-          <tbody>${sorted.map(([b,v],i)=>{
+          <table id="bairro-table"><thead><tr>
+            <th style="width:40px">#</th>
+            <th class="sortable-th${bairroSortCol==='name'?' sorted':''}" style="min-width:140px" onclick="sortBairroBy('name')">Bairro ${sortIcon('name')}</th>
+            <th class="sortable-th${bairroSortCol==='votes'?' sorted':''}" style="min-width:120px" onclick="sortBairroBy('votes')">Votos (Candidato) ${sortIcon('votes')}</th>
+            <th style="min-width:120px">% dos votos do cand.</th>
+          </tr></thead>
+          <tbody>${display.map(([b,v],i)=>{
+            const medal = bairroSortCol==='votes'&&bairroSortDir==='desc';
             return `<tr>
-              <td style="text-align:center;font-weight:700;color:${i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--text)'}">${i+1}</td>
+              <td style="text-align:center;font-weight:700;color:${medal&&i===0?'#ffd700':medal&&i===1?'#c0c0c0':medal&&i===2?'#cd7f32':'var(--text)'}">${i+1}</td>
               <td style="font-weight:600">${escHtml(b)}</td>
               <td>${fmt(v)}</td>
               <td>${pct(v,totalVotes)}</td>
@@ -1029,25 +1081,42 @@ function renderBairro(){
 }
 
 function renderBairroTable(resEl, mun, sorted, yr){
-  const top30 = sorted.slice(0,30);
   const totalVotes = sorted.reduce((s,[,d])=>s+(d.t||d),0);
-  const maxV = top30.length?(top30[0][1].t||top30[0][1]):1;
+  // Apply user-requested sort
+  let display;
+  if(bairroSortCol==='name'){
+    display = [...sorted].sort((a,b)=>bairroSortDir==='asc'?a[0].localeCompare(b[0]):b[0].localeCompare(a[0]));
+  } else {
+    display = bairroSortDir==='asc'?[...sorted].reverse():sorted;
+  }
+  // Chart always shows top-30 by votes regardless of sort
+  const chartTop30 = [...sorted].sort((a,b)=>(b[1].t||b[1])-(a[1].t||a[1])).slice(0,30);
+  const chartNote = sorted.length>30?` • Gráfico: top 30 de ${sorted.length}`:'';
+  const sortIcon = col => bairroSortCol!==col?'<span style="opacity:.3">⇅</span>':bairroSortDir==='asc'?'<span style="color:var(--accent)">↑</span>':'<span style="color:var(--accent)">↓</span>';
 
   resEl.innerHTML = `
     <div class="card" style="margin-bottom:16px">
       <h3>📊 Bairros de ${escHtml(mun)} — Votos Totais</h3>
-      <div class="tooltip-info">${fmt(totalVotes)} votos em ${sorted.length} bairros registrados</div>
+      <div class="tooltip-info">${fmt(totalVotes)} votos em ${sorted.length} bairros registrados${chartNote}</div>
       <div class="chart-container tall" style="margin-top:12px"><canvas id="bairro-chart"></canvas></div>
     </div>
     <div class="card">
       <h3>📋 Tabela de Bairros — ${escHtml(mun)}</h3>
+      <div style="margin-bottom:10px"><input class="bairro-tbl-filter" type="text" placeholder="🔍 Filtrar bairro..." oninput="filterBairroTable(this.value)"></div>
       <div class="tbl-wrap" style="max-height:640px;overflow-y:auto">
-        <table id="bairro-table"><thead><tr><th style="width:40px">#</th><th style="min-width:140px">Bairro</th><th style="min-width:110px">Total Votos</th><th style="min-width:80px">% do Mun.</th><th>Top Candidatos</th></tr></thead>
-        <tbody>${sorted.map(([b,d],i)=>{
+        <table id="bairro-table"><thead><tr>
+          <th style="width:40px">#</th>
+          <th class="sortable-th${bairroSortCol==='name'?' sorted':''}" style="min-width:140px" onclick="sortBairroBy('name')">Bairro ${sortIcon('name')}</th>
+          <th class="sortable-th${bairroSortCol==='votes'?' sorted':''}" style="min-width:110px" onclick="sortBairroBy('votes')">Total Votos ${sortIcon('votes')}</th>
+          <th style="min-width:80px">% do Mun.</th>
+          <th>Top Candidatos</th>
+        </tr></thead>
+        <tbody>${display.map(([b,d],i)=>{
           const tv = d.t||d;
           const tc = d.tc||[];
+          const medal = bairroSortCol==='votes'&&bairroSortDir==='desc';
           return `<tr>
-            <td style="text-align:center;font-weight:700;color:${i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--text)'}">${i+1}</td>
+            <td style="text-align:center;font-weight:700;color:${medal&&i===0?'#ffd700':medal&&i===1?'#c0c0c0':medal&&i===2?'#cd7f32':'var(--text)'}">${i+1}</td>
             <td style="font-weight:600">${escHtml(b)}</td>
             <td>${fmt(tv)}</td>
             <td>${pct(tv,totalVotes)}</td>
@@ -1058,14 +1127,49 @@ function renderBairroTable(resEl, mun, sorted, yr){
     </div>`;
 
   setTimeout(()=>{
-    makeChart('bairro-chart','bar', top30.map(x=>x[0]),
-      [{label:'Total de Votos', data:top30.map(x=>x[1].t||x[1]),
+    makeChart('bairro-chart','bar', chartTop30.map(x=>x[0]),
+      [{label:'Total de Votos', data:chartTop30.map(x=>x[1].t||x[1]),
         backgroundColor:'rgba(88,166,255,.75)', borderRadius:3}],
       {legend:false, indexAxis:'y',
        scales:{x:{ticks:{color:'#8b949e'},grid:{color:'rgba(48,54,61,.5)'}},
                y:{ticks:{color:'#e6edf3',font:{size:9}},grid:{color:'rgba(48,54,61,.5)'}}}}
     );
   },50);
+}
+
+function sortBairroBy(col){
+  if(bairroSortCol===col){ bairroSortDir = bairroSortDir==='desc'?'asc':'desc'; }
+  else { bairroSortCol=col; bairroSortDir = col==='name'?'asc':'desc'; }
+  renderBairro();
+}
+
+function filterBairroTable(q){
+  const rows = document.querySelectorAll('#bairro-table tbody tr');
+  const lq = q.toLowerCase();
+  rows.forEach(row=>{
+    const name = row.cells[1]?.textContent.toLowerCase()||'';
+    row.style.display = name.includes(lq)?'':'none';
+  });
+}
+
+function restoreBairroFilters(){
+  const mun = sessionStorage.getItem('bairro_mun');
+  const yr  = sessionStorage.getItem('bairro_yr');
+  const cand= sessionStorage.getItem('bairro_cand');
+  if(!mun) return;
+  document.getElementById('bairro-mun').value = mun;
+  onBairroMunChange();
+  if(cand){
+    selectBairroCand(cand);
+    setTimeout(()=>{
+      const sel = document.getElementById('bairro-year');
+      if(yr) sel.value = yr;
+      renderBairro();
+    },20);
+  } else if(yr){
+    document.getElementById('bairro-year').value = yr;
+    renderBairro();
+  }
 }
 
 function exportBairroExcel(){
