@@ -722,7 +722,8 @@ function renderMun(){
 
     html += `<div style="margin-bottom:20px">
       <div style="font-size:1.1rem;font-weight:700;color:var(--accent);margin-bottom:10px">📅 ${y}</div>
-      <div class="grid grid-2">${summaryHtml}`;
+      ${summaryHtml ? `<div style="margin-bottom:12px">${summaryHtml}</div>` : ''}
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:12px">`;
 
     cargos.forEach(cargo=>{
       const cands = data[y][cargo];
@@ -746,13 +747,13 @@ function renderMun(){
         <h3>${escHtml(cargo)}${electedLabel} · <span style="color:var(--text)">${fmt(total)} votos</span></h3>
         <div style="display:flex;flex-direction:column">`;
       display.forEach((c,i)=>{
-        html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border)">
-          <span class="rank-num ${i===0?'gold':i===1?'silver':i===2?'bronze':''}" style="font-size:.95rem;width:26px;flex-shrink:0">${i+1}</span>
+        html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 6px;border-bottom:1px solid var(--border)">
+          <span class="rank-num ${i===0?'gold':i===1?'silver':i===2?'bronze':''}" style="font-size:1rem;width:28px;flex-shrink:0;text-align:center">${i+1}</span>
           <div style="flex:1;min-width:0">
-            <div style="font-size:.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(c.c)}">${escHtml(c.c)}</div>
-            <div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap">
-              <span class="badge badge-blue" style="font-size:.7rem">${escHtml(c.p)}</span>
-              <span style="font-size:.75rem;color:var(--muted)">${fmt(c.v)} votos · ${pct(c.v,total)}</span>
+            <div style="font-size:.9rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(c.c)}">${escHtml(c.c)}</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
+              <span class="badge badge-blue" style="font-size:.72rem">${escHtml(c.p)}</span>
+              <span style="font-size:.8rem;color:var(--muted)">${fmt(c.v)} votos · ${pct(c.v,total)}</span>
             </div>
           </div>
           ${munStatusBadge(c.s)}
