@@ -744,27 +744,21 @@ function renderMun(){
 
       html += `<div class="card">
         <h3>${escHtml(cargo)}${electedLabel} · <span style="color:var(--text)">${fmt(total)} votos</span></h3>
-        <div class="tbl-wrap">
-        <table style="table-layout:fixed;min-width:0"><thead><tr>
-          <th style="width:7%">#</th>
-          <th style="width:35%">Candidato</th>
-          <th style="width:18%">Partido</th>
-          <th style="width:16%">Votos</th>
-          <th style="width:8%">%</th>
-          <th style="width:16%">Status</th>
-        </tr></thead>
-        <tbody>`;
+        <div style="display:flex;flex-direction:column">`;
       display.forEach((c,i)=>{
-        html += `<tr>
-          <td><span class="rank-num ${i===0?'gold':i===1?'silver':i===2?'bronze':''}">${i+1}</span></td>
-          <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(c.c)}">${escHtml(c.c)}</td>
-          <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span class="badge badge-blue">${escHtml(c.p)}</span></td>
-          <td style="white-space:nowrap">${fmt(c.v)}</td>
-          <td>${pct(c.v,total)}</td>
-          <td style="white-space:nowrap">${munStatusBadge(c.s)}</td>
-        </tr>`;
+        html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border)">
+          <span class="rank-num ${i===0?'gold':i===1?'silver':i===2?'bronze':''}" style="font-size:.95rem;width:26px;flex-shrink:0">${i+1}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(c.c)}">${escHtml(c.c)}</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap">
+              <span class="badge badge-blue" style="font-size:.7rem">${escHtml(c.p)}</span>
+              <span style="font-size:.75rem;color:var(--muted)">${fmt(c.v)} votos · ${pct(c.v,total)}</span>
+            </div>
+          </div>
+          ${munStatusBadge(c.s)}
+        </div>`;
       });
-      html += `</tbody></table></div></div>`;
+      html += `</div></div>`;
     });
 
     html += `</div></div>`;
