@@ -93,6 +93,7 @@ tr:hover td{background:var(--hover)}
 /* Responsive table fix */
 .tbl-wrap{overflow-x:auto;width:100%}
 .tbl-wrap table{min-width:440px}
+.tbl-wrap table#bairro-table{min-width:700px}
 .grid-2>.card,.grid-3>.card{min-width:0;overflow-wrap:break-word}
 /* Export bar */
 .export-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
@@ -1036,17 +1037,17 @@ function renderBairroTable(resEl, mun, sorted, yr){
     </div>
     <div class="card">
       <h3>📋 Tabela de Bairros — ${escHtml(mun)}</h3>
-      <div class="tbl-wrap" style="max-height:420px;overflow-y:auto">
-        <table id="bairro-table"><thead><tr><th>#</th><th>Bairro</th><th>Total Votos</th><th>% do Mun.</th><th>Top Candidatos</th></tr></thead>
+      <div class="tbl-wrap" style="max-height:640px;overflow-y:auto">
+        <table id="bairro-table"><thead><tr><th style="width:40px">#</th><th style="min-width:140px">Bairro</th><th style="min-width:110px">Total Votos</th><th style="min-width:80px">% do Mun.</th><th>Top Candidatos</th></tr></thead>
         <tbody>${sorted.slice(0,200).map(([b,d],i)=>{
           const tv = d.t||d;
           const tc = d.tc||[];
           return `<tr>
-            <td>${i+1}</td>
-            <td>${escHtml(b)}</td>
+            <td style="text-align:center;font-weight:700;color:${i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--text)'}">${i+1}</td>
+            <td style="font-weight:600">${escHtml(b)}</td>
             <td>${fmt(tv)}</td>
             <td>${pct(tv,totalVotes)}</td>
-            <td style="font-size:.78rem">${tc.map(x=>`<span style="display:inline-block;margin:1px 4px">${escHtml(x.c)}<span style="color:var(--muted)">(${fmt(x.v)})</span></span>`).join(', ')}</td>
+            <td style="font-size:.8rem;line-height:1.7">${tc.map(x=>`<span style="white-space:nowrap">${escHtml(x.c)}<span style="color:var(--muted);font-size:.75rem">(${fmt(x.v)})</span></span>`).join(' , ')}</td>
           </tr>`;
         }).join('')}</tbody></table>
       </div>
