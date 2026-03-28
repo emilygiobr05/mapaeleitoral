@@ -140,22 +140,22 @@ select:disabled{opacity:.45;cursor:not-allowed}
       <option value="all">Todos os anos</option>
     </select>
     <label>Partido:</label>
-    <select id="dash-partido" onchange="renderDashTable()">
+    <select id="dash-partido" onchange="renderDash()">
       <option value="all">Todos</option>
     </select>
     <label>Cargo:</label>
-    <select id="dash-cargo" onchange="renderDashTable()">
+    <select id="dash-cargo" onchange="renderDash()">
       <option value="all">Todos</option>
     </select>
     <label>Status:</label>
-    <select id="dash-status" onchange="renderDashTable()">
+    <select id="dash-status" onchange="renderDash()">
       <option value="all">Todos</option>
       <option value="ELEITO">Eleito</option>
       <option value="NÃO ELEITO">Não Eleito</option>
       <option value="SUPLENTE">Suplente</option>
     </select>
     <label>Município:</label>
-    <select id="dash-municipio" onchange="renderDashTable()">
+    <select id="dash-municipio" onchange="renderDash()">
       <option value="all">Todos</option>
     </select>
     <input type="text" id="dash-search" placeholder="Buscar candidato..." oninput="renderDashTable()" style="max-width:200px">
@@ -410,52 +410,122 @@ function initDash(){
 }
 
 function renderDash(){
-  const yr = document.getElementById('dash-year').value;
-  
-  // Stats
+  const yr  = document.getElementById('dash-year').value;
+  const pt  = document.getElementById('dash-partido').value;
+  const cg  = document.getElementById('dash-cargo').value;
+  const st  = document.getElementById('dash-status').value;
+  const mun = document.getElementById('dash-municipio').value;
+  const hasExtra = pt!=='all'||cg!=='all'||st!=='all'||mun!=='all';
+
   let totalVotos=0, totalCandidatos=0;
-  if(yr==='all'){
-    Object.values(DASH.vy).forEach(v=>totalVotos+=v);
-    totalCandidatos = Object.keys(CAND).length;
+  let vyAgg={}, vcAgg={}, vpAgg={}, vmAgg={};
+
+  if(!hasExtra){
+    // Fast path: use pre-aggregated DASH data (no extra filters active)
+    if(yr==='all'){
+      Object.values(DASH.vy).forEach(v=>totalVotos+=v);
+      totalCandidatos = Object.keys(CAND).length;
+    } else {
+      totalVotos = DASH.vy[yr]||0;
+      totalCandidatos = Object.values(CAND).filter(c=>c.a.includes(yr)).length;
+    }
+    DASH.years.forEach(y=>vyAgg[y]=DASH.vy[y]||0);
+    Object.entries(DASH.vcy).forEach(([c,yd])=>vcAgg[c]=yr==='all'?Object.values(yd).reduce((a,b)=>a+b,0):(yd[yr]||0));
+    Object.entries(DASH.vpy).forEach(([p,yd])=>vpAgg[p]=yr==='all'?Object.values(yd).reduce((a,b)=>a+b,0):(yd[yr]||0));
+    Object.entries(DASH.vmy).forEach(([m,yd])=>vmAgg[m]=yr==='all'?Object.values(yd).reduce((a,b)=>a+b,0):(yd[yr]||0));
   } else {
-    totalVotos = DASH.vy[yr]||0;
-    totalCandidatos = Object.values(CAND).filter(c=>c.a.includes(yr)).length;
+    // Filtered path: compute aggregates from CAND to apply all active filters
+    const matchedCands = new Set();
+    const seenYrCands = new Set(); // deduplicate year+candidate to avoid double-counting
+    Object.entries(CAND).forEach(([name,d])=>{
+      if(pt!=='all'&&d.p!==pt) return;
+      const stObj=d.st||{};
+      const stKeys=Object.keys(stObj);
+      let candMatched=false;
+      if(stKeys.length){
+        stKeys.forEach(k=>{
+          const [ky,...cp]=k.split('_'); const cargoLabel=cp.join('_');
+          if(yr!=='all'&&ky!==yr) return;
+          if(cg!=='all'&&cargoLabel!==cg) return;
+          const stVal=stObj[k]||'';
+          if(st!=='all'&&!stVal.toUpperCase().includes(st)) return;
+          const votes=mun!=='all'?((d.vm&&d.vm[ky]&&d.vm[ky][mun])||0):((d.va&&d.va[ky])||0);
+          if(!votes) return;
+          candMatched=true;
+          // Accumulate cargo votes (per matching cargo)
+          vcAgg[cargoLabel]=(vcAgg[cargoLabel]||0)+votes;
+          // Accumulate year/party/mun votes once per candidate+year to avoid double-counting
+          const yck=name+'_'+ky;
+          if(!seenYrCands.has(yck)){
+            seenYrCands.add(yck);
+            vyAgg[ky]=(vyAgg[ky]||0)+votes;
+            vpAgg[d.p]=(vpAgg[d.p]||0)+votes;
+            totalVotos+=votes;
+            if(mun==='all'){
+              Object.entries((d.vm&&d.vm[ky])||{}).forEach(([m,v])=>vmAgg[m]=(vmAgg[m]||0)+v);
+            } else {
+              vmAgg[mun]=(vmAgg[mun]||0)+votes;
+            }
+          }
+        });
+      } else {
+        (d.a||[]).forEach(ky=>{
+          if(yr!=='all'&&ky!==yr) return;
+          if(st!=='all') return;
+          (d.c||[]).forEach(cargoLabel=>{
+            if(cg!=='all'&&cargoLabel!==cg) return;
+            const votes=mun!=='all'?((d.vm&&d.vm[ky]&&d.vm[ky][mun])||0):((d.va&&d.va[ky])||0);
+            if(!votes) return;
+            candMatched=true;
+            vcAgg[cargoLabel]=(vcAgg[cargoLabel]||0)+votes;
+            const yck=name+'_'+ky;
+            if(!seenYrCands.has(yck)){
+              seenYrCands.add(yck);
+              vyAgg[ky]=(vyAgg[ky]||0)+votes;
+              vpAgg[d.p]=(vpAgg[d.p]||0)+votes;
+              totalVotos+=votes;
+              if(mun==='all'){
+                Object.entries((d.vm&&d.vm[ky])||{}).forEach(([m,v])=>vmAgg[m]=(vmAgg[m]||0)+v);
+              } else {
+                vmAgg[mun]=(vmAgg[mun]||0)+votes;
+              }
+            }
+          });
+        });
+      }
+      if(candMatched) matchedCands.add(name);
+    });
+    totalCandidatos=matchedCands.size;
   }
-  
+
+  // Stats
   const statsEl = document.getElementById('dash-stats');
   statsEl.innerHTML = `
     <div class="card stat-card"><div class="val">${fmt(totalVotos)}</div><div class="lbl">Total de Votos</div></div>
     <div class="card stat-card"><div class="val">${fmt(totalCandidatos)}</div><div class="lbl">Candidatos</div></div>
-    <div class="card stat-card"><div class="val">52</div><div class="lbl">Municípios</div></div>
+    <div class="card stat-card"><div class="val">${mun!=='all'?1:52}</div><div class="lbl">Municípios</div></div>
     <div class="card stat-card"><div class="val">${yr==='all'?DASH.years.length:1}</div><div class="lbl">${yr==='all'?'Eleições analisadas':'Ano selecionado'}</div></div>
   `;
-  
+
   // Year evolution
   const years = DASH.years;
   makeChart('ch-year','bar', years,
-    [{label:'Total de Votos', data: years.map(y=>DASH.vy[y]||0),
+    [{label:'Total de Votos', data: years.map(y=>vyAgg[y]||0),
       backgroundColor: years.map((_,i)=>COLORS[i%COLORS.length]),
       borderRadius:4}],
     {legend:false}
   );
-  
+
   // Cargo
-  const cargos = Object.keys(DASH.vcy);
-  const cargoData = cargos.map(c=>{
-    if(yr==='all') return Object.values(DASH.vcy[c]).reduce((a,b)=>a+b,0);
-    return DASH.vcy[c][yr]||0;
-  });
-  makeChart('ch-cargo','doughnut', cargos,
-    [{data:cargoData, backgroundColor:COLORS.slice(0,cargos.length), borderWidth:2, borderColor:'#161b22'}],
+  const cargoKeys = Object.keys(vcAgg).length?Object.keys(vcAgg):Object.keys(DASH.vcy);
+  const cargoData = cargoKeys.map(c=>vcAgg[c]||0);
+  makeChart('ch-cargo','doughnut', cargoKeys,
+    [{data:cargoData, backgroundColor:COLORS.slice(0,cargoKeys.length), borderWidth:2, borderColor:'#161b22'}],
     {legend:true}
   );
-  
+
   // Top 15 parties
-  const partyTotals = {};
-  Object.entries(DASH.vpy).forEach(([p,yd])=>{
-    partyTotals[p] = yr==='all' ? Object.values(yd).reduce((a,b)=>a+b,0) : (yd[yr]||0);
-  });
-  const topParties = Object.entries(partyTotals).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  const topParties = Object.entries(vpAgg).sort((a,b)=>b[1]-a[1]).slice(0,15);
   makeChart('ch-partido','bar', topParties.map(x=>x[0]),
     [{label:'Votos', data:topParties.map(x=>x[1]),
       backgroundColor:topParties.map(x=>partyColor(x[0])),
@@ -464,13 +534,9 @@ function renderDash(){
      scales:{x:{ticks:{color:'#8b949e',font:{size:10}},grid:{color:'rgba(48,54,61,.5)'}},
              y:{ticks:{color:'#e6edf3',font:{size:10}},grid:{color:'rgba(48,54,61,.5)'}}}}
   );
-  
+
   // Top 15 municipalities
-  const munTotals = {};
-  Object.entries(DASH.vmy).forEach(([m,yd])=>{
-    munTotals[m] = yr==='all' ? Object.values(yd).reduce((a,b)=>a+b,0) : (yd[yr]||0);
-  });
-  const topMuns = Object.entries(munTotals).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  const topMuns = Object.entries(vmAgg).sort((a,b)=>b[1]-a[1]).slice(0,15);
   makeChart('ch-mun','bar', topMuns.map(x=>x[0]),
     [{label:'Votos', data:topMuns.map(x=>x[1]),
       backgroundColor:'rgba(88,166,255,.7)',
@@ -479,7 +545,7 @@ function renderDash(){
      scales:{x:{ticks:{color:'#8b949e',font:{size:10}},grid:{color:'rgba(48,54,61,.5)'}},
              y:{ticks:{color:'#e6edf3',font:{size:10}},grid:{color:'rgba(48,54,61,.5)'}}}}
   );
-  
+
   renderDashTable();
 }
 
