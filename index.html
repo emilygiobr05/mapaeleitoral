@@ -745,16 +745,23 @@ function renderMun(){
       html += `<div class="card">
         <h3>${escHtml(cargo)}${electedLabel} · <span style="color:var(--text)">${fmt(total)} votos</span></h3>
         <div class="tbl-wrap">
-        <table><thead><tr><th>#</th><th>Candidato</th><th>Partido</th><th>Votos</th><th>%</th><th>Status</th></tr></thead>
+        <table style="table-layout:fixed;min-width:0"><thead><tr>
+          <th style="width:7%">#</th>
+          <th style="width:35%">Candidato</th>
+          <th style="width:18%">Partido</th>
+          <th style="width:16%">Votos</th>
+          <th style="width:8%">%</th>
+          <th style="width:16%">Status</th>
+        </tr></thead>
         <tbody>`;
       display.forEach((c,i)=>{
         html += `<tr>
           <td><span class="rank-num ${i===0?'gold':i===1?'silver':i===2?'bronze':''}">${i+1}</span></td>
-          <td style="white-space:nowrap">${escHtml(c.c)}</td>
-          <td><span class="badge badge-blue">${escHtml(c.p)}</span></td>
-          <td>${fmt(c.v)}</td>
+          <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(c.c)}">${escHtml(c.c)}</td>
+          <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span class="badge badge-blue">${escHtml(c.p)}</span></td>
+          <td style="white-space:nowrap">${fmt(c.v)}</td>
           <td>${pct(c.v,total)}</td>
-          <td>${munStatusBadge(c.s)}</td>
+          <td style="white-space:nowrap">${munStatusBadge(c.s)}</td>
         </tr>`;
       });
       html += `</tbody></table></div></div>`;
