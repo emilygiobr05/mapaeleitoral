@@ -106,6 +106,16 @@ tr:hover td{background:var(--hover)}
 .sortable-th{cursor:pointer;user-select:none;white-space:nowrap}.sortable-th:hover{color:var(--text)}.sortable-th.sorted{color:var(--accent)}
 .bairro-tbl-filter{background:var(--hover);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:.85rem;outline:none;transition:border .2s;min-width:180px}.bairro-tbl-filter:focus{border-color:var(--accent)}
 select:disabled{opacity:.45;cursor:not-allowed}
+/* ===== TENDÊNCIAS ===== */
+.trend-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;font-size:.75rem;font-weight:600}
+.trend-up{background:rgba(63,185,80,.15);color:#3fb950}
+.trend-down{background:rgba(247,129,102,.15);color:#f78166}
+.trend-flat{background:rgba(139,148,158,.15);color:#8b949e}
+/* ===== CENÁRIOS ===== */
+.cen-bar-wrap{position:relative;background:var(--border);border-radius:4px;height:24px;overflow:hidden}
+.cen-bar{height:100%;border-radius:4px;transition:width .5s;display:flex;align-items:center;padding:0 6px;min-width:2px}
+.cen-quota-line{position:absolute;top:0;bottom:0;width:2px;background:rgba(247,129,102,.8);z-index:1}
+
 </style>
 </head>
 <body>
@@ -126,6 +136,9 @@ select:disabled{opacity:.45;cursor:not-allowed}
   <button class="nav-btn" onclick="showSection('top50')">🏆 Top 50</button>
   <button class="nav-btn" onclick="showSection('bairro')">🏘️ Análise por Bairro</button>
   <button class="nav-btn" onclick="showSection('cruzamento')">🔄 Cruzamento de Dados</button>
+  <button class="nav-btn" onclick="showSection('cenarios')">🎯 Cenários</button>
+  <button class="nav-btn" onclick="showSection('tendencias')">📈 Tendências</button>
+  <button class="nav-btn" onclick="showSection('competitividade')">⚔️ Competitividade</button>
 </nav>
 
 <!-- ===== DASHBOARD ===== -->
@@ -312,8 +325,74 @@ select:disabled{opacity:.45;cursor:not-allowed}
     <button class="tab-btn" onclick="setCrossTab('mun_cargo')">Município × Cargo</button>
     <button class="tab-btn" onclick="setCrossTab('cargo_evolucao')">Evolução por Cargo</button>
     <button class="tab-btn" onclick="setCrossTab('partido_municipio')">Partido × Município</button>
+    <button class="tab-btn" onclick="setCrossTab('cand_bairro')">Candidato × Bairro</button>
   </div>
   <div id="cross-content"></div>
+</div>
+
+<!-- ===== CENÁRIOS ELEITORAIS ===== -->
+<div id="sec-cenarios" class="section">
+  <div class="section-header">
+    <div class="page-title">🎯 Cenários Eleitorais</div>
+    <div class="page-desc">Veja quem seria eleito, a cota eleitoral e a margem de cada candidato para qualquer eleição histórica</div>
+  </div>
+  <div class="filters">
+    <label>Município:</label>
+    <select id="cen-mun" onchange="onCenMunYearChange()">
+      <option value="">Selecione...</option>
+    </select>
+    <label>Ano:</label>
+    <select id="cen-year" onchange="onCenMunYearChange()">
+      <option value="">Selecione...</option>
+    </select>
+    <label>Cargo:</label>
+    <select id="cen-cargo" onchange="renderCenarios()">
+      <option value="">—</option>
+    </select>
+  </div>
+  <div id="cen-result"><div class="empty">Selecione município, ano e cargo para visualizar o cenário</div></div>
+</div>
+
+<!-- ===== TENDÊNCIAS ===== -->
+<div id="sec-tendencias" class="section">
+  <div class="section-header">
+    <div class="page-title">📈 Tendências &amp; Projeções</div>
+    <div class="page-desc">Evolução histórica dos partidos com projeção para a próxima eleição via regressão linear</div>
+  </div>
+  <div class="filters">
+    <label>Tipo de eleição:</label>
+    <select id="ten-filter" onchange="renderTendencias()">
+      <option value="municipal">Municipal (2016 / 2020 / 2024)</option>
+      <option value="estadual">Estadual / Federal (2018 / 2022)</option>
+    </select>
+  </div>
+  <div id="ten-result"><div class="empty">Carregando...</div></div>
+</div>
+
+<!-- ===== COMPETITIVIDADE ===== -->
+<div id="sec-competitividade" class="section">
+  <div class="section-header">
+    <div class="page-title">⚔️ Competitividade</div>
+    <div class="page-desc">Ranking de disputas por margem de vitória — identifique eleições acirradas e dominadas</div>
+  </div>
+  <div class="filters">
+    <label>Ano:</label>
+    <select id="comp-year" onchange="renderCompetitividade()">
+      <option value="all">Todos</option>
+    </select>
+    <label>Cargo:</label>
+    <select id="comp-cargo" onchange="renderCompetitividade()">
+      <option value="all">Todos</option>
+    </select>
+    <label>Margem mínima (%):</label>
+    <input type="number" id="comp-margin" value="0" min="0" max="100" step="1" style="width:70px" oninput="renderCompetitividade()">
+    <label>Ordenar:</label>
+    <select id="comp-order" onchange="renderCompetitividade()">
+      <option value="asc">Mais acirradas primeiro</option>
+      <option value="desc">Mais dominadas primeiro</option>
+    </select>
+  </div>
+  <div id="comp-result"><div class="empty">Carregando...</div></div>
 </div>
 
 <script>
@@ -332,6 +411,8 @@ const COLORS = [
   '#56d364','#ff7b72','#bc8cff','#f0883e','#a5d6ff','#85e89d',
   '#ff9492','#d4a4eb','#ffb77c'
 ];
+const RAIOX_COLORS = ['#58a6ff','#3fb950','#f78166'];
+let selectedCands = [null, null, null];
 const PARTY_COLORS = {};
 let partyColorIdx = 0;
 function partyColor(p){
@@ -382,6 +463,9 @@ function showSection(id){
   if(id==='top50') renderTop();
   if(id==='cruzamento') renderCross();
   if(id==='bairro') restoreBairroFilters();
+  if(id==='cenarios') renderCenarios();
+  if(id==='tendencias') renderTendencias();
+  if(id==='competitividade') renderCompetitividade();
 }
 
 // ===== DASHBOARD =====
@@ -645,19 +729,23 @@ function renderRaiox(){
   // Year breakdown per candidate
   const yearRows = active.map(name=>{
     const d = CAND[name];
-    return DASH.years.filter(y=>d.va[y]).map(y=>{
+    const yrsWithVotes = DASH.years.filter(y=>d.va[y]);
+    return yrsWithVotes.map((y,yi)=>{
       const statusKey = Object.keys(d.st||{}).filter(k=>k.startsWith(y+'_'));
       const statusHtml = statusKey.map(k=>{
         const v=d.st[k]; const [,cargo]=k.split(/_(.+)/);
         return `<span class="badge ${v.includes('ELEITO')&&!v.includes('NÃO')?'badge-green':'badge-red'}" style="margin:1px">${escHtml(cargo)}: ${escHtml(v)}</span>`;
       }).join('');
       const topMun = Object.entries(d.vm[y]||{}).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([m,v])=>`${escHtml(m)}: ${fmt(v)}`).join(' | ');
+      const prevY = yrsWithVotes[yi-1]; const curV = d.va[y]; const prevV = prevY?d.va[prevY]:null;
+      const growthHtml = prevV ? (() => {const g=(curV-prevV)/prevV*100; return `<span class="badge ${g>=0?'badge-green':'badge-red'}" style="font-size:.7rem">${g>=0?'+':''}${g.toFixed(1)}%</span>`;})() : '<span style="color:var(--muted)">—</span>';
       return `<tr>
         <td>${escHtml(name)}</td>
         <td>${y}</td>
         <td><span class="badge badge-blue">${escHtml(d.p)}</span></td>
         <td>${d.c.filter(c=>d.st&&Object.keys(d.st).some(k=>k.startsWith(y)&&k.includes(c))||true).map(escHtml).join(', ')}</td>
         <td><strong>${fmt(d.va[y])}</strong></td>
+        <td>${growthHtml}</td>
         <td style="font-size:.78rem;color:var(--muted)">${topMun}</td>
         <td>${statusHtml||'—'}</td>
       </tr>`;
@@ -695,7 +783,7 @@ function renderRaiox(){
       <h3>📅 Detalhamento por Ano — Partido · Cargo · Município · Status</h3>
       <div class="tbl-wrap" style="max-height:380px;overflow-y:auto">
         <table id="raiox-year-table">
-          <thead><tr><th>Candidato</th><th>Ano</th><th>Partido</th><th>Cargo(s)</th><th>Votos</th><th>Top Municípios</th><th>Status</th></tr></thead>
+          <thead><tr><th>Candidato</th><th>Ano</th><th>Partido</th><th>Cargo(s)</th><th>Votos</th><th>Var. %</th><th>Top Municípios</th><th>Status</th></tr></thead>
           <tbody>${yearRows}</tbody>
         </table>
       </div>
@@ -1288,7 +1376,8 @@ function setCrossTab(tab){
       tab==='partido_ano'?'Partido × Ano':
       tab==='mun_cargo'?'Município × Cargo':
       tab==='cargo_evolucao'?'Evolução':
-      'Partido × Município'
+      tab==='partido_municipio'?'Partido × Município':
+      'Candidato × Bairro'
     ));
   });
   renderCross();
@@ -1401,7 +1490,400 @@ function renderCross(){
     setTimeout(()=>makeChart('cross-chart','bar',top10muns,datasets3,{legend:true,
       scales:{x:{ticks:{color:'#8b949e',font:{size:9}},grid:{color:'rgba(48,54,61,.5)'}},
               y:{ticks:{color:'#8b949e'},grid:{color:'rgba(48,54,61,.5)'}}}}),50);
+  } else if(currentCrossTab==='cand_bairro'){
+    crossBairroCand=null;
+    el.innerHTML=`<div class="card">
+      <h3>🏘️ Candidato × Bairros — distribuição por localidade</h3>
+      <div class="filters">
+        <label>Candidato:</label>
+        <div class="search-container" style="max-width:320px">
+          <input type="text" id="cross-cand-search" placeholder="Buscar candidato..." oninput="searchCrossBarroCand(this.value)" autocomplete="off" style="width:100%">
+          <div id="cross-cand-res" class="search-results" style="display:none"></div>
+        </div>
+      </div>
+      <div id="cross-cand-bairro-result"><div class="empty">Busque e selecione um candidato para ver a distribuição por bairro</div></div>
+    </div>`;
   }
+}
+
+
+// ===== CENÁRIOS ELEITORAIS =====
+function initCenarios(){
+  const selMun = document.getElementById('cen-mun');
+  Object.keys(MUN).sort().forEach(m=>{
+    const o=document.createElement('option'); o.value=m; o.textContent=m; selMun.appendChild(o);
+  });
+  DASH.years.forEach(y=>{
+    const o=document.createElement('option'); o.value=y; o.textContent=y;
+    document.getElementById('cen-year').appendChild(o);
+  });
+}
+
+function onCenMunYearChange(){
+  const mun=document.getElementById('cen-mun').value;
+  const yr=document.getElementById('cen-year').value;
+  const selCargo=document.getElementById('cen-cargo');
+  selCargo.innerHTML='';
+  if(mun && yr && MUN[mun] && MUN[mun][yr]){
+    Object.keys(MUN[mun][yr]).sort().forEach(c=>{
+      const o=document.createElement('option'); o.value=c; o.textContent=c; selCargo.appendChild(o);
+    });
+  } else {
+    const o=document.createElement('option'); o.value=''; o.textContent='—'; selCargo.appendChild(o);
+  }
+  renderCenarios();
+}
+
+function renderCenarios(){
+  const mun=document.getElementById('cen-mun').value;
+  const yr=document.getElementById('cen-year').value;
+  const cargo=document.getElementById('cen-cargo').value;
+  const resEl=document.getElementById('cen-result');
+  if(!mun||!yr||!cargo){
+    resEl.innerHTML='<div class="empty">Selecione município, ano e cargo para visualizar o cenário</div>';
+    return;
+  }
+  const cands=(MUN[mun]&&MUN[mun][yr]&&MUN[mun][yr][cargo])||[];
+  if(!cands.length){resEl.innerHTML='<div class="empty">Sem dados para esta seleção</div>';return;}
+  const sorted=[...cands].sort((a,b)=>b.v-a.v);
+  const totalVotos=sorted.reduce((s,c)=>s+c.v,0);
+  const eleitos=sorted.filter(c=>c.s&&c.s.includes('ELEITO')&&!c.s.includes('NÃO'));
+  const numSeats=eleitos.length;
+  const isProportional=cargo.toUpperCase().includes('VEREADOR');
+  const quota=isProportional&&numSeats>0?Math.ceil(totalVotos/(numSeats+1)):0;
+  const maxV=sorted[0]?sorted[0].v:1;
+
+  let html=`<div class="card" style="margin-bottom:16px">
+    <h3>📊 ${escHtml(mun)} · ${escHtml(cargo)} · ${yr}</h3>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+      <div class="card stat-card" style="flex:1;min-width:110px"><div class="val" style="font-size:1.4rem">${fmt(totalVotos)}</div><div class="lbl">Votos válidos</div></div>
+      <div class="card stat-card" style="flex:1;min-width:110px"><div class="val" style="font-size:1.4rem;color:var(--accent2)">${numSeats}</div><div class="lbl">Vagas preenchidas</div></div>
+      <div class="card stat-card" style="flex:1;min-width:110px"><div class="val" style="font-size:1.4rem">${sorted.length}</div><div class="lbl">Candidatos</div></div>
+      ${isProportional&&quota?`<div class="card stat-card" style="flex:1;min-width:110px"><div class="val" style="font-size:1.4rem;color:var(--accent3)">${fmt(quota)}</div><div class="lbl">Quociente eleitoral</div></div>`:''}
+    </div>
+    ${isProportional&&quota?`<div style="font-size:.8rem;color:var(--muted);margin-bottom:14px;padding:8px;background:var(--hover);border-radius:6px">
+      ℹ️ Quociente eleitoral = ${fmt(totalVotos)} ÷ (${numSeats}+1) = <strong>${fmt(quota)}</strong> votos. A linha pontilhada indica esse limiar.
+    </div>`:''}
+    <div style="display:flex;flex-direction:column;gap:6px">`;
+
+  sorted.forEach((c,i)=>{
+    const isEleito=c.s&&c.s.includes('ELEITO')&&!c.s.includes('NÃO');
+    const isSuplente=c.s&&c.s.includes('SUPLENTE');
+    const barColor=isEleito?'#3fb950':isSuplente?'#ffd700':'#f78166';
+    const barPct=Math.max(1,Math.round(c.v/maxV*100));
+    const quotaPct=quota?Math.min(99,Math.round(quota/maxV*100)):null;
+    html+=`<div style="display:grid;grid-template-columns:190px 1fr auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)">
+      <div style="min-width:0">
+        <div style="font-size:.85rem;font-weight:${i<3?700:400};overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(c.c)}">${i+1}. ${escHtml(c.c)}</div>
+        <div style="font-size:.72rem;color:var(--muted)">${escHtml(c.p)}</div>
+      </div>
+      <div class="cen-bar-wrap">
+        <div class="cen-bar" style="width:${barPct}%;background:${barColor}">${barPct>14?`<span style="font-size:.7rem;font-weight:600;color:#000;white-space:nowrap">${fmt(c.v)}</span>`:''}</div>
+        ${quotaPct?`<div class="cen-quota-line" style="left:${quotaPct}%"></div>`:''}
+      </div>
+      <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+        <span style="font-size:.72rem;color:var(--muted)">${pct(c.v,totalVotos)}</span>
+        <span class="badge ${isEleito?'badge-green':isSuplente?'badge-yellow':'badge-red'}" style="font-size:.68rem;white-space:nowrap">${isEleito?'✓ Eleito':isSuplente?'Suplente':'Não eleito'}</span>
+      </div>
+    </div>`;
+  });
+  html+=`</div></div>`;
+
+  // Multi-year comparison
+  const otherYears=Object.keys(MUN[mun]||{}).filter(y=>y!==yr&&MUN[mun][y]&&MUN[mun][y][cargo]);
+  if(otherYears.length){
+    html+=`<div class="card"><h3>📅 Comparação com outros anos — ${escHtml(cargo)}</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:8px">`;
+    otherYears.sort().forEach(y=>{
+      const yCands=[...(MUN[mun][y][cargo]||[])].sort((a,b)=>b.v-a.v);
+      const yTotal=yCands.reduce((s,c)=>s+c.v,0);
+      const yEleitos=yCands.filter(c=>c.s&&c.s.includes('ELEITO')&&!c.s.includes('NÃO'));
+      html+=`<div class="card"><h3 style="color:var(--accent)">${y} <span style="font-size:.75rem;color:var(--muted);font-weight:400">${fmt(yTotal)} votos · ${yEleitos.length} eleitos</span></h3>
+        ${yCands.slice(0,6).map((c,i)=>{
+          const isEl=c.s&&c.s.includes('ELEITO')&&!c.s.includes('NÃO');
+          return `<div style="display:flex;justify-content:space-between;font-size:.8rem;padding:3px 0;border-bottom:1px solid var(--border)">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px" title="${escHtml(c.c)}">${i+1}. ${escHtml(c.c)}</span>
+            <span style="color:${isEl?'#3fb950':'var(--muted)'};flex-shrink:0;margin-left:4px">${fmt(c.v)}</span>
+          </div>`;
+        }).join('')}
+        ${yCands.length>6?`<div style="font-size:.72rem;color:var(--muted);margin-top:4px">+${yCands.length-6} candidatos</div>`:''}
+      </div>`;
+    });
+    html+=`</div></div>`;
+  }
+  resEl.innerHTML=html;
+}
+
+// ===== TENDÊNCIAS =====
+function linReg(xArr, yArr){
+  const n=xArr.length;
+  const sx=xArr.reduce((a,b)=>a+b,0), sy=yArr.reduce((a,b)=>a+b,0);
+  const sxy=xArr.reduce((acc,x,i)=>acc+x*yArr[i],0);
+  const sxx=xArr.reduce((acc,x)=>acc+x*x,0);
+  const slope=(n*sxy-sx*sy)/(n*sxx-sx*sx||1);
+  return {slope, intercept:(sy-slope*sx)/n};
+}
+
+function renderTendencias(){
+  const tendFilter=document.getElementById('ten-filter').value;
+  const isMun=tendFilter==='municipal';
+  const years=isMun?['2016','2020','2024']:['2018','2022'];
+  const nextYear=isMun?'2028':'2026';
+  const xVals=years.map((_,i)=>i);
+  const nextX=years.length;
+
+  const trends=Object.entries(DASH.vpy)
+    .map(([partido,yd])=>{
+      const yVals=years.map(y=>yd[y]||0);
+      if(!yVals.some(v=>v>0)) return null;
+      const {slope,intercept}=linReg(xVals,yVals);
+      const projected=Math.max(0,Math.round(intercept+slope*nextX));
+      const lastNonZero=yVals.reduceRight((a,v)=>a!==null?a:v>0?v:null,null)||0;
+      const firstNonZero=yVals.find(v=>v>0)||0;
+      const trendPct=firstNonZero>0?(lastNonZero-firstNonZero)/firstNonZero*100:0;
+      return {partido,yVals,total:yVals.reduce((a,b)=>a+b,0),slope,projected,trendPct};
+    })
+    .filter(x=>x&&x.total>0)
+    .sort((a,b)=>b.total-a.total);
+
+  const top10=trends.slice(0,10);
+  const growing=[...trends].filter(t=>t.slope>0).sort((a,b)=>b.slope-a.slope).slice(0,10);
+  const declining=[...trends].filter(t=>t.slope<=0).sort((a,b)=>a.slope-b.slope).slice(0,10);
+  const chartLabels=[...years,nextYear];
+
+  const datasets=top10.map((t,i)=>({
+    label:t.partido,
+    data:[...t.yVals,null],
+    borderColor:COLORS[i%COLORS.length],
+    backgroundColor:COLORS[i%COLORS.length]+'22',
+    tension:.3,fill:false,pointRadius:4,borderDash:[]
+  }));
+  const projDatasets=top10.map((t,i)=>({
+    label:'_'+t.partido,
+    data:[...t.yVals.map((_,j)=>j<t.yVals.length-1?null:t.yVals[j]),t.projected],
+    borderColor:COLORS[i%COLORS.length],
+    backgroundColor:'transparent',
+    borderDash:[6,4],tension:0,pointRadius:[...years.map(()=>0),5],
+    fill:false,showInLegend:false
+  }));
+
+  const resEl=document.getElementById('ten-result');
+  resEl.innerHTML=`
+    <div class="card" style="margin-bottom:16px">
+      <h3>📈 Evolução dos Top 10 Partidos (${isMun?'Municipal':'Estadual/Federal'}) — linha tracejada = projeção ${nextYear}</h3>
+      <div class="chart-container tall"><canvas id="ten-chart"></canvas></div>
+    </div>
+    <div class="grid grid-2" style="margin-bottom:16px">
+      <div class="card">
+        <h3 style="color:var(--accent2)">📈 Maiores crescimentos</h3>
+        ${growing.map(t=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+          <span style="font-weight:600">${escHtml(t.partido)}</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span class="badge badge-green" style="font-size:.7rem">${t.trendPct>=0?'+':''}${t.trendPct.toFixed(1)}%</span>
+            <span class="trend-badge trend-up">↑ +${fmt(Math.round(t.slope))}/el.</span>
+          </div>
+        </div>`).join('')}
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent3)">📉 Maiores declínios</h3>
+        ${declining.map(t=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+          <span style="font-weight:600">${escHtml(t.partido)}</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span class="badge badge-red" style="font-size:.7rem">${t.trendPct>=0?'+':''}${t.trendPct.toFixed(1)}%</span>
+            <span class="trend-badge trend-down">↓ ${fmt(Math.round(Math.abs(t.slope)))}/el.</span>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <h3>🔮 Projeção ${nextYear} — todos os partidos</h3>
+      <div class="tbl-wrap" style="max-height:420px;overflow-y:auto">
+        <table><thead><tr><th>#</th><th>Partido</th>${years.map(y=>`<th>${y}</th>`).join('')}<th>Proj. ${nextYear}</th><th>Tendência</th></tr></thead>
+        <tbody>${trends.map((t,i)=>{
+          const bg=t.slope>0?'badge-green':'badge-red';
+          const tr=t.slope>0?`↑ +${fmt(Math.round(t.slope))}/el.`:`↓ ${fmt(Math.round(Math.abs(t.slope)))}/el.`;
+          return `<tr><td>${i+1}</td><td><span class="badge badge-blue">${escHtml(t.partido)}</span></td>
+            ${t.yVals.map(v=>`<td>${v>0?fmt(v):'<span style="color:var(--muted)">—</span>'}</td>`).join('')}
+            <td><strong>${fmt(t.projected)}</strong></td>
+            <td><span class="badge ${bg}" style="font-size:.7rem">${tr}</span></td></tr>`;
+        }).join('')}</tbody></table>
+      </div>
+      <div class="tooltip-info">Projeção via regressão linear simples. Apenas indicativo — não considera mudanças políticas, fusões ou eventos externos.</div>
+    </div>`;
+
+  setTimeout(()=>{
+    makeChart('ten-chart','line',chartLabels,[...datasets,...projDatasets],
+      {legend:true,
+       plugins:{legend:{labels:{filter:item=>!item.text.startsWith('_')}}},
+       scales:{x:{ticks:{color:'#8b949e'},grid:{color:'rgba(48,54,61,.5)'}},
+               y:{ticks:{color:'#8b949e',callback:v=>v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(0)+'K':v},
+                  grid:{color:'rgba(48,54,61,.5)'}}}}
+    );
+  },50);
+}
+
+// ===== COMPETITIVIDADE =====
+function initCompetitividade(){
+  const selY=document.getElementById('comp-year');
+  DASH.years.forEach(y=>{const o=document.createElement('option');o.value=y;o.textContent=y;selY.appendChild(o);});
+  const cargos=new Set();
+  Object.values(MUN).forEach(munD=>Object.values(munD).forEach(yd=>Object.keys(yd).forEach(c=>cargos.add(c))));
+  const selC=document.getElementById('comp-cargo');
+  Array.from(cargos).sort().forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;selC.appendChild(o);});
+  renderCompetitividade();
+}
+
+function renderCompetitividade(){
+  const yr=document.getElementById('comp-year').value;
+  const cargo=document.getElementById('comp-cargo').value;
+  const minMargin=parseFloat(document.getElementById('comp-margin').value)||0;
+  const orderDir=document.getElementById('comp-order').value;
+  const resEl=document.getElementById('comp-result');
+
+  const rows=[];
+  Object.entries(MUN).forEach(([mun,munData])=>{
+    const years2=yr==='all'?Object.keys(munData):[yr];
+    years2.forEach(y=>{
+      if(!munData[y]) return;
+      const cargos2=cargo==='all'?Object.keys(munData[y]):[cargo];
+      cargos2.forEach(c=>{
+        if(!munData[y][c]) return;
+        const cands=[...munData[y][c]].sort((a,b)=>b.v-a.v);
+        if(cands.length<2) return;
+        const total=cands.reduce((s,x)=>s+x.v,0);
+        if(!total) return;
+        const eleitos=cands.filter(x=>x.s&&x.s.includes('ELEITO')&&!x.s.includes('NÃO'));
+        const isProp=c.toUpperCase().includes('VEREADOR');
+        let margin,winner,runnerUp;
+        if(isProp){
+          if(!eleitos.length) return;
+          const lastEl=eleitos[eleitos.length-1];
+          const firstNEl=cands.find(x=>!(x.s&&x.s.includes('ELEITO')&&!x.s.includes('NÃO')));
+          if(!firstNEl) return;
+          margin=lastEl.v-firstNEl.v; winner=lastEl.c; runnerUp=firstNEl.c;
+        } else {
+          margin=cands[0].v-cands[1].v; winner=cands[0].c; runnerUp=cands[1].c;
+        }
+        const marginPct=margin/total*100;
+        if(marginPct<minMargin) return;
+        rows.push({mun,year:y,cargo:c,winner,runnerUp,winnerParty:(cands.find(x=>x.c===winner)||{}).p||'',margin,marginPct,total,eleitos:eleitos.length});
+      });
+    });
+  });
+
+  if(orderDir==='asc') rows.sort((a,b)=>a.marginPct-b.marginPct);
+  else rows.sort((a,b)=>b.marginPct-a.marginPct);
+
+  if(!rows.length){resEl.innerHTML='<div class="empty">Nenhuma disputa encontrada para os filtros selecionados</div>';return;}
+
+  const maxMPct=Math.max(...rows.map(r=>r.marginPct));
+  resEl.innerHTML=`
+    <div class="grid grid-4" style="margin-bottom:16px">
+      <div class="card stat-card"><div class="val">${rows.length}</div><div class="lbl">Disputas analisadas</div></div>
+      <div class="card stat-card"><div class="val" style="color:var(--accent3)">${rows.filter(r=>r.marginPct<5).length}</div><div class="lbl">Muito acirradas (&lt;5%)</div></div>
+      <div class="card stat-card"><div class="val" style="color:#ffd700">${rows.filter(r=>r.marginPct>=5&&r.marginPct<20).length}</div><div class="lbl">Moderadas (5–20%)</div></div>
+      <div class="card stat-card"><div class="val" style="color:var(--accent2)">${rows.filter(r=>r.marginPct>=20).length}</div><div class="lbl">Dominadas (≥20%)</div></div>
+    </div>
+    <div class="card">
+      <h3>⚔️ Ranking — ${rows.length} disputas</h3>
+      <div class="tbl-wrap" style="max-height:520px;overflow-y:auto">
+        <table><thead><tr><th>#</th><th>Município</th><th>Ano</th><th>Cargo</th><th>Vencedor / Último Eleito</th><th>Adversário</th><th>Margem</th><th>Margem %</th><th>Tipo</th></tr></thead>
+        <tbody>${rows.slice(0,300).map((r,i)=>{
+          const col=r.marginPct<5?'#f78166':r.marginPct<20?'#ffd700':'#3fb950';
+          const lbl=r.marginPct<5?'🔴 Acirrada':r.marginPct<20?'🟡 Moderada':'🟢 Dominante';
+          return `<tr>
+            <td>${i+1}</td>
+            <td style="font-size:.82rem">${escHtml(r.mun)}</td>
+            <td>${r.year}</td>
+            <td style="font-size:.82rem">${escHtml(r.cargo)}</td>
+            <td style="font-weight:600;font-size:.82rem;color:var(--accent2)">${escHtml(r.winner)}<span class="badge badge-blue" style="margin-left:4px;font-size:.65rem">${escHtml(r.winnerParty)}</span></td>
+            <td style="font-size:.82rem">${escHtml(r.runnerUp)}</td>
+            <td style="font-size:.82rem">${fmt(r.margin)}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-weight:700;color:${col}">${r.marginPct.toFixed(1)}%</span>
+                <div style="background:var(--border);border-radius:3px;height:6px;width:50px;overflow:hidden">
+                  <div style="height:100%;background:${col};width:${Math.min(100,r.marginPct/maxMPct*100).toFixed(1)}%;border-radius:3px"></div>
+                </div>
+              </div>
+            </td>
+            <td>${lbl}</td>
+          </tr>`;
+        }).join('')}</tbody></table>
+      </div>
+      ${rows.length>300?`<div class="tooltip-info">Mostrando 300 de ${rows.length} disputas. Use os filtros para refinar.</div>`:''}
+    </div>`;
+}
+
+// ===== CANDIDATO × BAIRRO (Cruzamento) =====
+let crossBairroCand = null;
+function searchCrossBarroCand(q){
+  const res=document.getElementById('cross-cand-res');
+  if(!res) return;
+  if(q.length<2){res.style.display='none';return;}
+  const matches=Object.entries(CAND)
+    .filter(([n,d])=>n.toUpperCase().includes(q.toUpperCase())&&Object.keys(d.vb||{}).length>0)
+    .sort((a,b)=>b[1].tv-a[1].tv).slice(0,12);
+  if(!matches.length){res.style.display='none';return;}
+  res.innerHTML=matches.map(([n,d],i)=>
+    `<div class="search-item" data-cand="${i}" data-crossidx="1">${escHtml(n)}<div class="sub">${escHtml(d.p)} · ${fmt(d.tv)} votos</div></div>`
+  ).join('');
+  res._matches=matches;
+  res.style.display='block';
+}
+function selectCrossBarroCand(name){
+  crossBairroCand=name;
+  const inp=document.getElementById('cross-cand-search');
+  if(inp) inp.value=name;
+  const res=document.getElementById('cross-cand-res');
+  if(res) res.style.display='none';
+  renderCrossBarroCand();
+}
+function renderCrossBarroCand(){
+  const el=document.getElementById('cross-cand-bairro-result');
+  if(!el) return;
+  if(!crossBairroCand||!CAND[crossBairroCand]){
+    el.innerHTML='<div class="empty">Busque e selecione um candidato</div>';return;
+  }
+  const d=CAND[crossBairroCand];
+  const allBairros={};
+  Object.entries(d.vb||{}).forEach(([y,byd])=>Object.entries(byd).forEach(([b,v])=>allBairros[b]=(allBairros[b]||0)+v));
+  const sortedB=Object.entries(allBairros).sort((a,b)=>b[1]-a[1]);
+  if(!sortedB.length){el.innerHTML='<div class="empty">Sem dados de bairro para este candidato</div>';return;}
+  const maxV=sortedB[0][1];
+  const totalV=sortedB.reduce((s,[,v])=>s+v,0);
+
+  // Per-year bairro datasets for chart
+  const topB=sortedB.slice(0,15).map(x=>x[0]);
+  const years=d.a?[...d.a].sort():[];
+  const datasets=years.map((y,i)=>({
+    label:y, data:topB.map(b=>(d.vb[y]&&d.vb[y][b])||0),
+    backgroundColor:COLORS[i%COLORS.length]+'cc', borderRadius:2
+  }));
+
+  el.innerHTML=`
+    <div class="card" style="margin-bottom:12px">
+      <h3>🏘️ ${escHtml(crossBairroCand)} — Top 15 Bairros por Votos Totais</h3>
+      <div class="chart-container tall"><canvas id="cross-bairro-chart"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>📋 Detalhe por bairro (${sortedB.length} bairros · ${fmt(totalV)} votos totais)</h3>
+      <div class="tbl-wrap" style="max-height:360px;overflow-y:auto">
+        <table><thead><tr><th>#</th><th>Bairro</th><th>Votos Totais</th><th>%</th><th>Desempenho</th></tr></thead>
+        <tbody>${sortedB.map(([b,v],i)=>`<tr>
+          <td>${i+1}</td><td>${escHtml(b)}</td><td><strong>${fmt(v)}</strong></td>
+          <td>${pct(v,totalV)}</td>
+          <td><div class="progress-bar"><div class="progress-fill" style="width:${Math.round(v/maxV*100)}%"></div></div></td>
+        </tr>`).join('')}
+        </tbody></table>
+      </div>
+    </div>`;
+
+  setTimeout(()=>{
+    makeChart('cross-bairro-chart','bar',topB,datasets,{legend:true,indexAxis:'y',
+      scales:{x:{stacked:false,ticks:{color:'#8b949e'},grid:{color:'rgba(48,54,61,.5)'}},
+              y:{stacked:false,ticks:{color:'#e6edf3',font:{size:9}},grid:{color:'rgba(48,54,61,.5)'}}}});
+  },50);
 }
 
 // ===== DASHBOARD TABLE =====
@@ -1554,9 +2036,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
   initMun();
   initTop();
   initBairro();
+  initCenarios();
+  initCompetitividade();
   document.getElementById('bairro-result').innerHTML='<div class="empty">Selecione um município para ver os bairros</div>';
   document.getElementById('raiox-result').innerHTML='<div class="empty">Busque e selecione pelo menos um candidato para visualizar a análise</div>';
   renderCross();
+  renderTendencias();
   
   // Close search dropdowns on outside click
   document.addEventListener('click', e=>{
@@ -1574,6 +2059,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     if(!res || !res._matches) return;
     const [name] = res._matches[idx];
     if(slot !== undefined) selectCand(parseInt(slot), name);
+    else if(item.dataset.crossidx) selectCrossBarroCand(name);
     else selectBairroCand(name);
   });
   // Event delegation for remove buttons
