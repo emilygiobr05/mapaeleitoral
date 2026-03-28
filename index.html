@@ -692,12 +692,12 @@ function renderMun(){
     cargos.forEach(cargo=>{
       const cands = data[y][cargo];
       const total = cands.reduce((s,c)=>s+c.v,0);
-      const top5 = cands.slice(0,5);
+      const top20 = cands.slice(0,20);
       html += `<div class="card">
         <h3>${cargo} · <span style="color:var(--text)">${fmt(total)} votos</span></h3>
         <table><thead><tr><th>#</th><th>Candidato</th><th>Partido</th><th>Votos</th><th>%</th><th>Status</th></tr></thead>
         <tbody>`;
-      top5.forEach((c,i)=>{
+      top20.forEach((c,i)=>{
         const badge = c.s.includes('ELEITO')&&!c.s.includes('NÃO') ? 'badge-green' : c.s?'badge-red':'';
         html += `<tr>
           <td><span class="rank-num ${i===0?'gold':i===1?'silver':i===2?'bronze':''}">${i+1}</span></td>
